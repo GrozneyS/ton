@@ -440,7 +440,7 @@ void AdnlPeerTableImpl::get_stats(td::Promise<tl_object_ptr<ton_api::adnl_stats>
   for (auto &[id, local_id] : local_ids_) {
     td::actor::send_closure(callback, &Cb::inc_pending);
     td::actor::send_closure(local_id.local_id, &AdnlLocalId::get_stats,
-                            [id, callback](td::Result<tl_object_ptr<ton_api::adnl_stats_localId>> R) {
+                            [id = id, callback](td::Result<tl_object_ptr<ton_api::adnl_stats_localId>> R) {
                               if (R.is_error()) {
                                 VLOG(ADNL_NOTICE)
                                     << "failed to get stats for local id " << id << " : " << R.move_as_error();
@@ -452,16 +452,16 @@ void AdnlPeerTableImpl::get_stats(td::Promise<tl_object_ptr<ton_api::adnl_stats>
   }
   for (auto &[id, peer] : peers_) {
     td::actor::send_closure(callback, &Cb::inc_pending);
-    td::actor::send_closure(peer, &AdnlPeer::get_stats,
-                            [id, callback](td::Result<std::vector<tl_object_ptr<ton_api::adnl_stats_peerPair>>> R) {
-                              if (R.is_error()) {
-                                VLOG(ADNL_NOTICE)
-                                    << "failed to get stats for peer " << id << " : " << R.move_as_error();
-                                td::actor::send_closure(callback, &Cb::dec_pending);
-                              } else {
-                                td::actor::send_closure(callback, &Cb::got_peer_stats, R.move_as_ok());
-                              }
-                            });
+    td::actor::send_closure(
+        peer, &AdnlPeer::get_stats,
+        [id = id, callback](td::Result<std::vector<tl_object_ptr<ton_api::adnl_stats_peerPair>>> R) {
+          if (R.is_error()) {
+            VLOG(ADNL_NOTICE) << "failed to get stats for peer " << id << " : " << R.move_as_error();
+            td::actor::send_closure(callback, &Cb::dec_pending);
+          } else {
+            td::actor::send_closure(callback, &Cb::got_peer_stats, R.move_as_ok());
+          }
+        });
   }
   td::actor::send_closure(callback, &Cb::dec_pending);
 }
